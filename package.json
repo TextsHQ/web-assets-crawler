@@ -1,0 +1,33 @@
+{
+  "name": "web-assets-crawler",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "prepare": "tsc",
+    "build": "tsc",
+    "postinstall": "tsc",
+    "lint": "eslint src --ext ts,tsx,js,jsx --cache"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn lint --fix || true; git add ."
+    }
+  },
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "chalk": "^4.1.0",
+    "execa": "^4.0.3",
+    "js-beautify": "^1.13.0",
+    "prettier": "^2.1.1",
+    "puppeteer": "^5.2.1"
+  },
+  "devDependencies": {
+    "@textshq/eslint-config": "link:../packages/eslint-config",
+    "@types/bluebird": "^3.5.32",
+    "@types/eslint": "^7.2.2",
+    "@types/js-beautify": "^1.11.0",
+    "@types/puppeteer": "^3.0.1",
+    "eslint": "^7.5.0",
+    "typescript": "^3.9.7"
+  }
+}
