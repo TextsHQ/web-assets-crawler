@@ -29,7 +29,7 @@ async function processResource(site: Site, res) {
   const { hostname, pathname } = url.parse(res.url)
   const isJS = pathname.endsWith('.js')
   const isCSS = pathname.endsWith('.css')
-  if ((!isJS && !isCSS) || (site.ignoreURLList || []).includes(res.url)) {
+  if ((!isJS && !isCSS) || (site.ignoreURLList || []).includes(hostname + pathname)) {
     console.log(chalk.gray('ignoring'), res.url)
     return
   }

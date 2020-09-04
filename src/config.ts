@@ -4,8 +4,8 @@ import path from 'path'
 import { Site, NormalizeArgs } from './types'
 
 const ignoreURLList = [
-  'https://www.google-analytics.com/analytics.js',
-  'https://connect.facebook.net/en_US/sdk.js',
+  'www.google-analytics.com/analytics.js',
+  'connect.facebook.net/en_US/sdk.js',
 ]
 
 const genericNormalize = ({ pathname }: NormalizeArgs) => ({
