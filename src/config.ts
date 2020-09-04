@@ -5,6 +5,7 @@ import { Site, NormalizeArgs } from './types'
 
 const ignoreURLList = [
   'https://www.google-analytics.com/analytics.js',
+  'https://connect.facebook.net/en_US/sdk.js',
 ]
 
 const genericNormalize = ({ pathname }: NormalizeArgs) => ({
@@ -55,6 +56,7 @@ export default {
       id: 'instagram',
       pageURL: 'https://www.instagram.com/',
       normalize: igNormalize,
+      ignoreURLList,
     },
     {
       id: 'messenger',
