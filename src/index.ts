@@ -14,6 +14,7 @@ import { writeFileCreatingDir } from './util'
 
 function tryBeautify(body: Buffer, isJS: boolean, isCSS: boolean) {
   try {
+    if (!body) return
     const txt = body.toString('utf-8')
     if (isJS) {
       const beautified = jsBeautify.js(txt)
