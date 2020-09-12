@@ -36,7 +36,7 @@ const messengerNormalize = ({ body, pathname }: NormalizeArgs) => {
 }
 
 export default {
-  waitAfterIdleMs: 16_000,
+  waitAfterIdleMs: 20_000,
   userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4182.0 Safari/537.36',
   outputGitDirLocation: path.join(os.homedir(), 'Documents/wac/git'),
   outputNormalizedDirLocation: path.join(os.homedir(), 'Documents/wac/regular'),
