@@ -1,56 +1,90 @@
+import url from 'url'
+import path from 'path'
+import { promises as fs } from 'fs'
 import puppeteer from 'puppeteer'
 import chalk from 'chalk'
 import bluebird from 'bluebird'
-import url from 'url'
-import path from 'path'
 import execa from 'execa'
-import jsBeautify from 'js-beautify'
-import prettier from 'prettier'
-import { promises as fs } from 'fs'
+import got from 'got'
+import { truncate } from 'lodash'
 
 import config from './config'
 import { Site } from './types'
-import { writeFileCreatingDir } from './util'
+import { writeFileCreatingDir, extractSourceMapURL } from './util'
+import { extractSourceMapSources } from './source-map'
+import { tryBeautify } from './beautify'
 
-function tryBeautify(body: Buffer, isJS: boolean, isCSS: boolean) {
-  try {
-    if (!body) return
-    const txt = body.toString('utf-8')
-    if (isJS) {
-      const beautified = jsBeautify.js(txt)
-      return prettier.format(beautified, { parser: 'babel' })
-    }
-    if (isCSS) return jsBeautify.css(txt)
-  } catch (err) {
-    console.error(chalk.red('[error] beautify'), err)
+type Resource = {
+  url: string
+  body: Buffer
+}
+
+async function writeFile(site: Site, resURL: string, body: string) {
+  const { hostname, pathname } = url.parse(resURL)
+
+  const fileName = path.basename(pathname)
+  const { normalizedDirName, normalizedFileName } = site.normalize({ hostname, pathname, body })
+
+  const regularDirPath = path.join(config.outputNormalizedDirLocation, site.id, hostname, path.dirname(pathname))
+  const gitDirPath = path.join(config.outputGitDirLocation, site.id, hostname, normalizedDirName)
+
+  await writeFileCreatingDir(regularDirPath, fileName, body)
+  await writeFileCreatingDir(gitDirPath, normalizedFileName, body)
+  if (fileName !== normalizedFileName) await writeFileCreatingDir(gitDirPath, normalizedFileName + '.og-url.txt', resURL)
+
+  console.log(resURL, chalk.green('→'), fileName, normalizedFileName)
+}
+
+function fetch(uri: string) {
+  if (uri.startsWith('data:')) {
+    const b64 = uri.split(',')?.[1]
+    if (!b64) return null
+    return Buffer.from(b64, 'base64').toString()
+  }
+  console.log(chalk`Fetching source map at {gray ${uri}}`)
+  return got(uri, { responseType: 'text', resolveBodyOnly: true, throwHttpErrors: false })
+}
+
+async function processSourceMap(site: Site, resURL: string, sourceMapURL: string) {
+  const { hostname } = url.parse(resURL)
+  const sourceMap = await fetch(sourceMapURL)
+  if (!sourceMap) return
+  console.log(chalk`{green Source map found} for ${resURL}`, sourceMapURL.startsWith('data:') ? null : `at ${sourceMapURL}`)
+  const sources = await extractSourceMapSources(sourceMap)
+  for (const { originalURL, filePath, source } of sources) {
+    const dirPath = path.join(config.outputGitDirLocation, site.id, hostname + '_sources', path.dirname(filePath))
+    console.log('[source map]', originalURL.href, chalk.green('→'), filePath, `[${source.length} bytes]`)
+    await writeFileCreatingDir(dirPath, path.basename(filePath), source)
   }
 }
 
-async function processResource(site: Site, res) {
+async function processResource(site: Site, res: Resource) {
   const { hostname, pathname } = url.parse(res.url)
+
   const isJS = pathname.endsWith('.js')
   const isCSS = pathname.endsWith('.css')
   if ((!isJS && !isCSS) || (site.ignoreURLList || []).includes(hostname + pathname)) {
-    console.log(chalk.gray('ignoring'), res.url)
+    console.log(chalk.gray('ignoring'), truncate(res.url, { length: 100 }))
     return
   }
-  const body = tryBeautify(res.body, isJS, isCSS)
-  const fileName = path.basename(pathname)
-  const { normalizedDirName, normalizedFileName } = site.normalize({ hostname, pathname, body })
-  const regularDirPath = path.join(config.outputNormalizedDirLocation, site.id, hostname, path.dirname(pathname))
-  const gitDirPath = path.join(config.outputGitDirLocation, site.id, hostname, normalizedDirName)
-  await writeFileCreatingDir(regularDirPath, fileName, body)
-  await writeFileCreatingDir(gitDirPath, normalizedFileName, body)
-  if (fileName !== normalizedFileName) await writeFileCreatingDir(gitDirPath, normalizedFileName + '.og-url.txt', res.url)
-  console.log(res.url, chalk.green('→'), fileName, normalizedFileName)
+
+  const sourceMapURL = extractSourceMapURL(res.body.toString(), res.url) || res.url + '.map'
+  if (sourceMapURL) {
+    await processSourceMap(site, res.url, sourceMapURL)
+  }
+
+  const beautified = tryBeautify(res.body, isJS, isCSS)
+  await writeFile(site, res.url, beautified)
 }
+
+const gitExec = (...args: string[]) => execa('git', args, { cwd: config.outputGitDirLocation, stdio: 'inherit' })
 
 async function gitCommit(site: Site) {
   console.log(chalk`{green Committing} ${site.id}`)
   const gitDirPath = path.join(config.outputGitDirLocation, site.id)
   try {
-    await execa('git', ['add', gitDirPath], { cwd: config.outputGitDirLocation, stdio: 'inherit' })
-    await execa('git', ['commit', '-m', site.id], { cwd: config.outputGitDirLocation, stdio: 'inherit' })
+    await gitExec('add', gitDirPath)
+    await gitExec('commit', '-m', site.id)
   } catch (err) {
     console.error(err)
   }
@@ -74,14 +108,14 @@ async function processSite(site: Site) {
   // from https://stackoverflow.com/questions/52969381/how-can-i-capture-all-network-requests-and-full-response-data-when-loading-a-pag
 
   let paused = false
-  const pausedRequests = []
+  const pausedRequests: Array<() => any> = []
 
   const nextRequest = () => { // continue the next request or "unpause"
     if (pausedRequests.length === 0) {
       paused = false
     } else {
       // continue first request in "queue"
-      (pausedRequests.shift())() // calls the request.continue function
+      (pausedRequests.shift())?.() // calls the request.continue function
     }
   }
 
@@ -97,14 +131,14 @@ async function processSite(site: Site) {
   page.on('requestfinished', async request => {
     const response = request.response()
 
-    let body: Buffer
+    let body: Buffer = undefined
     if (request.redirectChain().length === 0) {
       try {
-        body = await response.buffer()
+        body = await response?.buffer()
       } catch (err) { console.error(err) }
     }
 
-    const resource = {
+    const resource: Resource = {
       url: request.url(),
       body,
       // requestHeaders: request.headers(),
@@ -138,10 +172,10 @@ async function processSite(site: Site) {
 async function main() {
   const [,, ...args] = process.argv
   try {
-    fs.access(path.join(config.outputGitDirLocation, '.git'))
+    await fs.access(path.join(config.outputGitDirLocation, '.git'))
   } catch (err) {
-    console.error(err)
-    console.error('Make sure git repository exists at', config.outputGitDirLocation)
+    console.error('Creating git repository at', config.outputGitDirLocation)
+    await gitExec('init')
   }
   const only = args[0] === 'only'
   await bluebird.map(config.sites, async site => {
