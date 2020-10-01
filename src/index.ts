@@ -46,8 +46,9 @@ async function processSourceMap(site: Site, resURL: string, sourceMapURL: string
   const { hostname } = url.parse(resURL)
   const sourceMap = await fetch(sourceMapURL)
   if (!sourceMap) return
-  console.log(chalk`{green Source map found} for ${resURL}`, sourceMapURL.startsWith('data:') ? null : `at ${sourceMapURL}`)
   const sources = await extractSourceMapSources(sourceMap)
+  if (!sources) return
+  console.log(chalk`{green Source map found} for ${resURL}`, sourceMapURL.startsWith('data:') ? null : `at ${sourceMapURL}`)
   for (const { originalURL, filePath, source } of sources) {
     const dirPath = path.join(config.outputGitDirLocation, site.id, hostname + '_sources', path.dirname(filePath))
     console.log('[source map]', originalURL.href, chalk.green('→'), filePath, `[${source.length} bytes]`)
