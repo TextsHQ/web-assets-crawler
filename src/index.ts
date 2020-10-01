@@ -8,16 +8,13 @@ import execa from 'execa'
 import got from 'got'
 import { truncate } from 'lodash'
 
-import config from './config'
-import { Site } from './types'
+import { Site, Resource } from './types'
 import { writeFileCreatingDir, extractSourceMapURL } from './util'
 import { extractSourceMapSources } from './source-map'
 import { tryBeautify } from './beautify'
+import type ConfigModule from './config'
 
-type Resource = {
-  url: string
-  body: Buffer
-}
+const config = require('./' + (process.env.CONFIG || 'config')).default as typeof ConfigModule
 
 async function writeFile(site: Site, resURL: string, body: string) {
   const { hostname, pathname } = url.parse(resURL)
@@ -77,7 +74,8 @@ async function processResource(site: Site, res: Resource) {
   await writeFile(site, res.url, beautified)
 }
 
-const gitExec = (...args: string[]) => execa('git', args, { cwd: config.outputGitDirLocation, stdio: 'inherit' })
+const gitExec = (...args: string[]) =>
+  execa('git', args, { cwd: config.outputGitDirLocation, stdio: 'inherit' })
 
 async function gitCommit(site: Site) {
   console.log(chalk`{green Committing} ${site.id}`)
@@ -171,9 +169,13 @@ async function processSite(site: Site) {
 
 async function main() {
   const [,, ...args] = process.argv
+  if (!config.sites) {
+    throw new Error('config is invalid')
+  }
   try {
     await fs.access(path.join(config.outputGitDirLocation, '.git'))
   } catch (err) {
+    console.error(err.message)
     console.error('Creating git repository at', config.outputGitDirLocation)
     await gitExec('init')
   }

@@ -14,3 +14,8 @@ export type Site = {
     normalizedFileName: string
   }
 }
+
+export type Resource = {
+  url: string
+  body: Buffer
+}
