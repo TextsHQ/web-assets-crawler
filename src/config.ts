@@ -63,5 +63,10 @@ export default {
       pageURL: 'https://www.messenger.com/',
       normalize: messengerNormalize,
     },
+    {
+      id: 'discord',
+      pageURL: 'https://discord.com/login',
+      normalize: genericNormalize,
+    }
   ] as Site[],
 }
