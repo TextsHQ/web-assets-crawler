@@ -67,6 +67,11 @@ export default {
       id: 'discord',
       pageURL: 'https://discord.com/login',
       normalize: genericNormalize,
+    },
+    {
+      id: 'linkedin',
+      pageURL: 'https://www.linkedin.com/',
+      normalize: genericNormalize,
     }
   ] as Site[],
 }
