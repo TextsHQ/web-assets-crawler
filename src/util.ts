@@ -5,7 +5,7 @@ import { trimEnd } from 'lodash'
 
 export async function writeFileCreatingDir(dirPath: string, fileName: string, data: string | Buffer) {
   await fs.mkdir(dirPath, { recursive: true })
-  await fs.writeFile(path.join(dirPath, fileName), data)
+  if (data) await fs.writeFile(path.join(dirPath, fileName), data)
 }
 
 /*

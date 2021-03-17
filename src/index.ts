@@ -66,7 +66,7 @@ async function processResource(site: Site, res: Resource) {
     return
   }
 
-  const sourceMapURL = extractSourceMapURL(res.body.toString(), res.url) || res.url + '.map'
+  const sourceMapURL = extractSourceMapURL(res.body?.toString(), res.url) || res.url + '.map'
   if (sourceMapURL) {
     await processSourceMap(site, res.url, sourceMapURL)
   }
